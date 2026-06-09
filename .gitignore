@@ -1,0 +1,62 @@
+# Root .gitignore for YT Chat project
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+backend/.venv/
+venv/
+env/
+
+# Environment / secret files
+.env
+.env.*
+backend/.env
+
+# ChromaDB / storage
+/backend/storage/
+/backend/storage/chroma_db/
+/storage/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test and coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDEs and editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Node
+node_modules/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keys, certificates
+*.pem
+*.key
+
+# Misc
+*.sqlite3

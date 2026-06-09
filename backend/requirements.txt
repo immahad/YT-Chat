@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# YT Chat Backend — Requirements
+# Requires: Python 3.11  (numpy 1.26.x crashes on Python 3.13 Windows)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Web Framework ─────────────────────────────────────────────────────────────
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.9
+
+# ── LangChain 0.3.x (stable, fully supported on Python 3.11) ─────────────────
+langchain==0.3.13
+langchain-core==0.3.30
+langchain-community==0.3.13
+langchain-experimental==0.3.4
+langchain-text-splitters==0.3.5
+
+# ── LLM Provider Integrations ─────────────────────────────────────────────────
+langchain-google-genai==2.0.7
+langchain-openai==0.2.14
+langchain-anthropic==0.3.3
+
+# ── Vector Store (chromadb 0.5.x + langchain-chroma 0.1.4 = stable combo) ────
+chromadb==0.5.23
+langchain-chroma==0.1.4
+
+# ── Retrieval ─────────────────────────────────────────────────────────────────
+rank-bm25==0.2.2
+sentence-transformers==2.7.0
+
+# ── YouTube Transcript ────────────────────────────────────────────────────────
+youtube-transcript-api==1.0.3
+
+# ── Evaluation ───────────────────────────────────────────────────────────────
+ragas==0.2.6
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+pydantic==2.10.3
+tiktoken==0.8.0

@@ -1,0 +1,33 @@
+# Backend-specific .gitignore
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual env
+.venv/
+
+# Env files
+.env
+*.env
+
+# ChromaDB storage
+storage/
+storage/chroma_db/
+
+# Logs and runtime files
+*.log
+*.sqlite3
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
