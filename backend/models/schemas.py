@@ -9,21 +9,32 @@ from typing import Literal, Optional
 
 class LLMConfig(BaseModel):
     """User's LLM configuration sent from the Chrome extension."""
-    provider: Literal["google", "openai", "anthropic", "grok"] = "google"
+    provider: Literal["google", "openai"] = "google"
     api_key: str = Field(..., description="The user's API key for the chosen provider")
-    # Optional second key needed for Anthropic/Grok (which have no embeddings)
-    google_api_key: Optional[str] = Field(
-        None,
-        description="Google API key for embeddings (required if provider is anthropic or grok)"
-    )
     chat_model: str = Field(
         "gemini-2.0-flash",
         description="Chat model name. Defaults to Gemini 2.0 Flash."
     )
     temperature: float = Field(0.2, ge=0.0, le=1.0)
 
+    # Keep for backwards compatibility with old saved settings that include this field
+    google_api_key: Optional[str] = Field(None, exclude=True)
+
 
 # ── Index Endpoint ────────────────────────────────────────────────────────────
+
+class ClientTranscriptSegment(BaseModel):
+    text: str = Field(..., min_length=1)
+    start: float = Field(0.0, ge=0.0)
+    duration: float = Field(0.0, ge=0.0)
+
+
+class ClientTranscript(BaseModel):
+    segments: list[ClientTranscriptSegment] = Field(..., min_length=1)
+    language: str = "unknown"
+    is_generated: bool = True
+    source: str = "browser"
+
 
 class IndexRequest(BaseModel):
     """Request to index a YouTube video's transcript."""
@@ -32,6 +43,10 @@ class IndexRequest(BaseModel):
     force_reindex: bool = Field(
         False,
         description="If True, re-index even if video is already cached"
+    )
+    transcript: Optional[ClientTranscript] = Field(
+        None,
+        description="Optional transcript captured by the browser extension"
     )
 
 
@@ -58,22 +73,22 @@ class ChatRequest(BaseModel):
 class CitationChunk(BaseModel):
     """A retrieved transcript chunk with its timestamp."""
     content:         str
-    start_seconds:   float = 0.0    # timestamp in seconds (for jump-to link)
-    timestamp_label: str   = ""     # human-readable label e.g. "1:33"
+    start_seconds:   float = 0.0
+    timestamp_label: str   = ""
     relevance_score: float = 0.0
 
 
 class ChatResponse(BaseModel):
-    answer:     str
-    citations:  list[CitationChunk] = []
-    used_rag:   bool = True         # False if routed to general knowledge
-    tokens_used: int = 0
+    answer:      str
+    citations:   list[CitationChunk] = []
+    used_rag:    bool = True
+    tokens_used: int  = 0
 
 
 # ── Status Endpoint ───────────────────────────────────────────────────────────
 
 class StatusResponse(BaseModel):
-    video_id: str
+    video_id:   str
     is_indexed: bool
     num_chunks: int = 0
 
@@ -81,18 +96,18 @@ class StatusResponse(BaseModel):
 # ── Evaluate Endpoint ─────────────────────────────────────────────────────────
 
 class EvalSample(BaseModel):
-    question: str
+    question:     str
     ground_truth: str
 
 
 class EvaluateRequest(BaseModel):
-    video_id: str
-    samples: list[EvalSample]
+    video_id:   str
+    samples:    list[EvalSample]
     llm_config: LLMConfig
 
 
 class EvaluateResponse(BaseModel):
-    faithfulness: float = 0.0
-    answer_relevancy: float = 0.0
-    context_precision: float = 0.0
-    context_recall: float = 0.0
+    faithfulness:       float = 0.0
+    answer_relevancy:   float = 0.0
+    context_precision:  float = 0.0
+    context_recall:     float = 0.0

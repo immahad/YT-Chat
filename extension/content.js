@@ -25,13 +25,13 @@
   }
 
   function getVideoTitle() {
-    // Try multiple selectors (YouTube changes these sometimes)
     const selectors = [
       "h1.ytd-video-primary-info-renderer yt-formatted-string",
       "#title h1 yt-formatted-string",
       "ytd-video-primary-info-renderer h1",
       "#above-the-fold #title h1",
       "h1.style-scope.ytd-watch-metadata",
+      "ytd-watch-metadata h1 yt-formatted-string",
     ];
     for (const sel of selectors) {
       const el = document.querySelector(sel);
@@ -42,9 +42,10 @@
     return document.title.replace(" - YouTube", "").trim() || "YouTube Video";
   }
 
-  function notifyVideoDetected() {
+  function notifyVideoDetected(force = false) {
     const videoId = extractVideoId(window.location.href);
-    if (!videoId || videoId === lastVideoId) return;
+    if (!videoId) return;
+    if (!force && videoId === lastVideoId) return;
 
     lastVideoId = videoId;
 
@@ -56,21 +57,22 @@
         videoId:    videoId,
         videoTitle: title,
       }).catch(() => {});
-    }, 1000);
+    }, 800);
   }
 
   // ── Initial detection ─────────────────────────────────────────────────────
   notifyVideoDetected();
 
   // ── YouTube SPA navigation events ─────────────────────────────────────────
-  window.addEventListener("yt-navigate-finish", notifyVideoDetected);
-  window.addEventListener("popstate",           notifyVideoDetected);
+  window.addEventListener("yt-navigate-finish", () => notifyVideoDetected());
+  window.addEventListener("popstate",           () => notifyVideoDetected());
 
-  // ── Polling fallback (YouTube sometimes doesn't fire events) ──────────────
+  // ── Polling fallback ──────────────────────────────────────────────────────
   setInterval(() => {
     const videoId = extractVideoId(window.location.href);
     if (videoId && videoId !== lastVideoId) {
       notifyVideoDetected();
     }
   }, 3000);
+
 })();
