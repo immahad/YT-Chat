@@ -48,18 +48,14 @@ async def lifespan(app: FastAPI):
         await asyncio.get_event_loop().run_in_executor(None, _get_cross_encoder)
         logger.info("✅ Cross-encoder loaded and ready")
     except Exception as e:
-        logger.warning(f"Cross-encoder warm-up failed (will load on first request): {e}")
+        logger.warning(f"Cross-encoder warm-up failed: {e}")
     yield
     logger.info("👋 YT Chat backend shutting down")
 
 
 # ── FastAPI App ───────────────────────────────────────────────────────────────
 
-app = FastAPI(
-    title="YT Chat — RAG API",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+app = FastAPI(title="YT Chat — RAG API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,30 +66,21 @@ app.add_middleware(
 )
 
 
-# ── Global error handlers — ALWAYS return JSON, never HTML ───────────────────
+# ── Global error handlers — always return JSON ────────────────────────────────
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception on {request.url}: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc)},
-    )
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logger.warning(f"Validation error on {request.url}: {exc}")
-    return JSONResponse(
-        status_code=422,
-        content={"detail": str(exc)},
-    )
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-    )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -113,66 +100,60 @@ async def get_status(video_id: str):
 async def index_video_endpoint(request: IndexRequest):
     video_id = request.video_id.strip()
 
+    # Cache hit
     if not request.force_reindex:
         already, count = is_indexed(video_id)
         if already:
             logger.info(f"Cache hit: {video_id} ({count} chunks)")
             return IndexResponse(
-                video_id=video_id,
-                status="already_cached",
-                num_chunks=count,
-                message=f"Video already indexed with {count} chunks. Ready to chat!",
+                video_id=video_id, status="already_cached", num_chunks=count,
+                message=f"Already indexed with {count} chunks. Ready to chat!",
             )
 
     try:
-        if request.transcript:
-            logger.info(f"Using browser transcript for: {video_id}")
-            transcript = _build_browser_transcript(video_id, request.transcript)
+        # ── Path A: Browser transcript supplied by extension (always preferred) ──
+        if request.transcript and request.transcript.segments:
+            logger.info(f"Using browser transcript for {video_id} "
+                        f"({len(request.transcript.segments)} segments)")
+            transcript = VideoTranscript(
+                video_id=video_id,
+                segments=[
+                    TranscriptSegment(
+                        text=seg.text.strip(),
+                        start=float(seg.start or 0.0),
+                        duration=float(seg.duration or 0.0),
+                    )
+                    for seg in request.transcript.segments
+                    if seg.text and seg.text.strip()
+                ],
+                language=request.transcript.language or "unknown",
+                is_generated=bool(request.transcript.is_generated),
+            )
+            if not transcript.segments:
+                raise ValueError("Browser transcript contained no usable text segments.")
+
+        # ── Path B: Fallback — library fetch (may fail on some networks) ─────────
         else:
-            logger.info(f"Fetching transcript for: {video_id}")
+            logger.info(f"No browser transcript — using library fallback for {video_id}")
             transcript = await asyncio.get_event_loop().run_in_executor(
                 None, fetch_transcript, video_id
             )
-        logger.info(f"Got {transcript.num_segments} segments for {video_id}")
+
+        logger.info(f"Transcript ready: {transcript.num_segments} segments for {video_id}")
 
         embeddings = get_embeddings(request.llm_config)
-
         _, num_chunks = await asyncio.get_event_loop().run_in_executor(
             None, lambda: index_video(transcript, embeddings, force=request.force_reindex)
         )
 
         return IndexResponse(
-            video_id=video_id,
-            status="indexed",
-            num_chunks=num_chunks,
-            message=f"Successfully indexed {num_chunks} chunks. Ready to chat!",
+            video_id=video_id, status="indexed", num_chunks=num_chunks,
+            message=f"Indexed {num_chunks} chunks. Ready to chat!",
         )
 
     except Exception as e:
         logger.error(f"Indexing failed for {video_id}: {e}", exc_info=True)
-        # Return 500 with JSON detail — never let FastAPI generate an HTML page
         raise HTTPException(status_code=500, detail=f"Failed to index video: {str(e)}")
-
-
-def _build_browser_transcript(video_id: str, client_transcript) -> VideoTranscript:
-    segments = [
-        TranscriptSegment(
-            text=seg.text.strip(),
-            start=float(seg.start or 0.0),
-            duration=float(seg.duration or 0.0),
-        )
-        for seg in client_transcript.segments
-        if seg.text and seg.text.strip()
-    ]
-    if not segments:
-        raise ValueError("Browser transcript was empty.")
-
-    return VideoTranscript(
-        video_id=video_id,
-        segments=segments,
-        language=client_transcript.language or "unknown",
-        is_generated=bool(client_transcript.is_generated),
-    )
 
 
 @app.post("/chat")
@@ -182,32 +163,25 @@ async def chat_endpoint(request: ChatRequest):
 
     indexed, _ = is_indexed(video_id)
     if not indexed:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Video '{video_id}' is not indexed. Call /index first."
-        )
+        raise HTTPException(status_code=404,
+            detail=f"Video '{video_id}' is not indexed. Call /index first.")
 
     async def event_generator():
         try:
-            loop = asyncio.get_event_loop()
-            llm          = get_chat_llm(request.llm_config)
-            embeddings   = get_embeddings(request.llm_config)
+            loop        = asyncio.get_event_loop()
+            llm         = get_chat_llm(request.llm_config)
+            embeddings  = get_embeddings(request.llm_config)
             vector_store = load_vector_store(video_id, embeddings)
 
-            route = await loop.run_in_executor(
-                None, lambda: route_question(question, llm)
-            )
+            route = await loop.run_in_executor(None, lambda: route_question(question, llm))
 
             if route == "GENERAL":
                 yield f"data: {json.dumps({'type': 'route', 'value': 'general'})}\n\n"
-
                 tokens = await loop.run_in_executor(
-                    None,
-                    lambda: list(stream_general_answer(question, llm, request.conversation_history))
+                    None, lambda: list(stream_general_answer(question, llm, request.conversation_history))
                 )
                 for token in tokens:
                     yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-
                 yield f"data: {json.dumps({'type': 'done', 'used_rag': False})}\n\n"
                 yield "data: [DONE]\n\n"
                 return
@@ -216,27 +190,22 @@ async def chat_endpoint(request: ChatRequest):
 
             all_docs = []
             try:
-                all_docs_raw = vector_store.get()
-                doc_texts = all_docs_raw.get("documents") or []
-                doc_metas = all_docs_raw.get("metadatas") or [{}] * len(doc_texts)
+                raw = vector_store.get()
                 from langchain_core.documents import Document
-                for doc_text, meta in zip(doc_texts, doc_metas):
-                    if doc_text:
-                        all_docs.append(Document(page_content=doc_text, metadata=meta or {}))
+                for txt, meta in zip(raw.get("documents") or [], raw.get("metadatas") or [{}] * len(raw.get("documents") or [])):
+                    if txt:
+                        all_docs.append(Document(page_content=txt, metadata=meta or {}))
             except Exception as e:
-                logger.warning(f"Could not fetch all docs for BM25: {e}")
+                logger.warning(f"BM25 doc fetch failed: {e}")
 
-            retrieved_docs = await loop.run_in_executor(
-                None,
-                lambda: retrieve(question, vector_store, all_docs, embeddings, llm)
+            retrieved = await loop.run_in_executor(
+                None, lambda: retrieve(question, vector_store, all_docs, embeddings, llm)
             )
 
-            citations = build_citations(retrieved_docs)
-            yield f"data: {json.dumps({'type': 'citations', 'data': citations})}\n\n"
+            yield f"data: {json.dumps({'type': 'citations', 'data': build_citations(retrieved)})}\n\n"
 
             tokens = await loop.run_in_executor(
-                None,
-                lambda: list(stream_rag_answer(question, retrieved_docs, llm, request.conversation_history))
+                None, lambda: list(stream_rag_answer(question, retrieved, llm, request.conversation_history))
             )
             for token in tokens:
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
@@ -258,20 +227,12 @@ async def chat_endpoint(request: ChatRequest):
 
 @app.delete("/index/{video_id}")
 async def delete_index_endpoint(video_id: str):
-    success = delete_index(video_id)
-    if success:
+    if delete_index(video_id):
         return {"status": "deleted", "video_id": video_id}
-    raise HTTPException(status_code=404, detail=f"No index found for video '{video_id}'")
+    raise HTTPException(status_code=404, detail=f"No index found for '{video_id}'")
 
-
-# ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host=os.getenv("HOST", "localhost"),
-        port=int(os.getenv("PORT", 8000)),
-        reload=True,
-        log_level="info",
-    )
+    uvicorn.run("main:app", host=os.getenv("HOST", "localhost"),
+                port=int(os.getenv("PORT", 8000)), reload=True, log_level="info")
