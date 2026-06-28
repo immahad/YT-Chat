@@ -45,7 +45,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Sidebar is asking: "what video is in the active tab right now?"
   // We inject/re-run the content script so it fires VIDEO_DETECTED fresh.
   if (message.type === "REQUEST_VIDEO_ID") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
       const tab = tabs[0];
       if (!tab) { sendResponse(null); return; }
 
@@ -96,4 +96,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       files:  ["content.js"],
     }).catch(() => {});
   }
+});
+
+// ── Clean up session storage when a tab is closed ────────────────────────────
+chrome.tabs.onRemoved.addListener((tabId) => {
+  const key = `tab_${tabId}_video`;
+  chrome.storage.session.get(key, (data) => {
+    const stored = data[key];
+    if (stored && stored.videoId) {
+      chrome.storage.session.remove(`chat_${stored.videoId}`);
+    }
+    chrome.storage.session.remove(key);
+  });
 });

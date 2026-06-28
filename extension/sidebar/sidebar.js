@@ -4,7 +4,7 @@
 
 "use strict";
 
-const API_BASE = "https://yt-chat-zjz0.onrender.com";
+const API_BASE = "http://localhost:8000";
 
 const PROVIDER_MODELS = {
   groq: [
@@ -167,12 +167,20 @@ async function checkCurrentTab() {
     });
     if (videoData && videoData.videoId) { handleVideoChange(videoData.videoId, videoData.videoTitle); return; }
 
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab && tab.url && tab.url.includes("youtube.com/watch")) {
       const url = new URL(tab.url);
       const videoId = url.searchParams.get("v");
-      if (videoId) handleVideoChange(videoId, tab.title?.replace(" - YouTube", "").trim() || "YouTube Video");
+      if (videoId) {
+        handleVideoChange(videoId, tab.title?.replace(" - YouTube", "").trim() || "YouTube Video");
+        return;
+      }
     }
+    
+    // Not a YouTube video
+    showScreen("no-video");
+    currentVideoId = null;
+    currentVideoTitle = null;
   } catch (e) { console.warn("checkCurrentTab error:", e); }
 }
 
@@ -190,6 +198,11 @@ async function handleVideoChange(videoId, videoTitle) {
     }
     return;
   }
+  
+  if (currentVideoId && conversationHistory.length > 0) {
+    saveChatState(currentVideoId, conversationHistory);
+  }
+
   currentVideoId = videoId;
   currentVideoTitle = videoTitle || "YouTube Video";
   conversationHistory = [];
@@ -199,7 +212,24 @@ async function handleVideoChange(videoId, videoTitle) {
   videoStatusEl.textContent = "Checking...";
   videoStatusEl.className = "video-status";
   if (!settings.apiKey) { showScreen("setup"); return; }
-  triggerIndexing(videoId);
+  
+  const restored = await restoreChatState(videoId);
+  if (restored) {
+    showChatScreen();
+    safeFetch(`${API_BASE}/status/${videoId}`).then(async res => {
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data && data.is_indexed) {
+          isIndexed = true;
+          videoStatusEl.textContent = `✓ Ready (${data.num_chunks} chunks cached)`;
+          videoStatusEl.className = "video-status indexed";
+          btnReindex.classList.remove("hidden");
+        }
+      }
+    });
+  } else {
+    triggerIndexing(videoId);
+  }
 }
 
 // ── Indexing ──────────────────────────────────────────────────────────────────
@@ -436,8 +466,13 @@ function _browserTranscriptScript() {
 }
 
 async function collectBrowserTranscript() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id || !tab.url?.includes("youtube.com/watch")) return null;
+  const tabs = await chrome.tabs.query({ url: "*://*.youtube.com/watch*" });
+  const tab = tabs.find(t => t.url.includes(currentVideoId)) || tabs[0];
+
+  if (!tab?.id) {
+    console.warn("Could not find matching YouTube tab for ID:", currentVideoId);
+    return null;
+  }
 
   let results;
   try {
@@ -603,8 +638,9 @@ async function sendMessage() {
     if (citations.length > 0 && usedRag)
       assistantMsgEl.querySelector(".message-content").appendChild(renderCitations(citations));
     conversationHistory.push({ role: "user", content: question });
-    conversationHistory.push({ role: "assistant", content: fullAnswer });
+    conversationHistory.push({ role: "assistant", content: fullAnswer, usedRag, citations });
     if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+    saveChatState(currentVideoId, conversationHistory);
 
   } catch (e) {
     console.error("Chat error:", e);
@@ -707,7 +743,7 @@ function escapeHtml(text) {
 
 async function jumpToTimestamp(seconds) {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (!tab) return;
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -736,6 +772,48 @@ function scrollToBottom() {
   messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
 }
 
+// ── State Management ──────────────────────────────────────────────────────────
+function saveChatState(videoId, history) {
+  if (!videoId) return;
+  chrome.storage.session.set({ [`chat_${videoId}`]: history });
+}
+
+async function restoreChatState(videoId) {
+  return new Promise((resolve) => {
+    chrome.storage.session.get(`chat_${videoId}`, (data) => {
+      const history = data[`chat_${videoId}`];
+      if (history && history.length > 0) {
+        conversationHistory = history;
+        messagesEl.innerHTML = "";
+        for (const msg of history) {
+          if (msg.role === "user") {
+            addUserMessage(msg.content);
+          } else if (msg.role === "assistant") {
+            addSavedAssistantMessage(msg);
+          }
+        }
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+  });
+}
+
+function addSavedAssistantMessage(msg) {
+  const el = document.createElement("div");
+  el.className = "message assistant";
+  const badgeHtml = msg.usedRag === false 
+    ? `<div class="route-badge general">🌐 General Knowledge</div>`
+    : `<div class="route-badge rag">📹 Video Grounded</div>`;
+  el.innerHTML = `<div class="message-avatar">✨</div><div class="message-content">${badgeHtml}<div class="message-bubble">${formatAnswer(msg.content)}</div></div>`;
+  if (msg.citations && msg.citations.length > 0 && msg.usedRag !== false) {
+    el.querySelector(".message-content").appendChild(renderCitations(msg.citations));
+  }
+  messagesEl.appendChild(el);
+  scrollToBottom();
+}
+
 // ── Event Listeners ───────────────────────────────────────────────────────────
 function setupEventListeners() {
   btnSettings.addEventListener("click", () => settingsPanel.classList.remove("hidden"));
@@ -754,6 +832,9 @@ function setupEventListeners() {
   $("btn-clear-history").addEventListener("click", () => {
     conversationHistory = [];
     messagesEl.innerHTML = "";
+    if (currentVideoId) {
+      chrome.storage.session.remove(`chat_${currentVideoId}`);
+    }
     renderWelcomeMessage();
   });
   btnReindex.addEventListener("click", async () => {
@@ -789,6 +870,17 @@ function setupEventListeners() {
   settingsPanel.addEventListener("click", (e) => {
     if (e.target === settingsPanel) settingsPanel.classList.add("hidden");
   });
+
+  if (chrome.tabs) {
+    chrome.tabs.onActivated.addListener(() => {
+      checkCurrentTab();
+    });
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (tab.active && changeInfo.url) {
+        checkCurrentTab();
+      }
+    });
+  }
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────

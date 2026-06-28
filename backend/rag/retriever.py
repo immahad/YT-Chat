@@ -179,11 +179,6 @@ def rerank_documents(
     if not docs:
         return []
 
-    import os
-    if os.getenv("DISABLE_CROSS_ENCODER", "false").lower() == "true" or os.getenv("RENDER", "false").lower() == "true":
-        logger.info("Running on Render (or cross-encoder disabled). Skipping reranking.")
-        return docs[:top_k]
-
     cross_encoder = _get_cross_encoder()
     pairs = [(question, doc.page_content) for doc in docs]
 
