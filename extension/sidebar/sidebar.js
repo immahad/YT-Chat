@@ -4,7 +4,7 @@
 
 "use strict";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "https://yt-chat-zjz0.onrender.com";
 
 const PROVIDER_MODELS = {
   groq: [
@@ -389,20 +389,20 @@ function _browserTranscriptScript() {
                 .replace(/&amp;/g, "&").replace(/&lt;/g, "<")
                 .replace(/&gt;/g, ">").replace(/&#39;/g, "'")
                 .replace(/&quot;/g, '"').trim(),
-              start:    parseFloat(n.getAttribute("start")   || "0"),
-              duration: parseFloat(n.getAttribute("dur")     || "0"),
+              start: parseFloat(n.getAttribute("start") || "0"),
+              duration: parseFloat(n.getAttribute("dur") || "0"),
             }))
             .filter(s => s.text);
           if (xmlSegs.length) {
             return {
-              segments:    xmlSegs,
-              language:    track.languageCode || "unknown",
+              segments: xmlSegs,
+              language: track.languageCode || "unknown",
               is_generated: track.kind === "asr",
-              source:      "browser",
+              source: "browser",
             };
           }
         }
-        return { error: `XML returned but contained no segments. Content: ${text.slice(0,100)}` };
+        return { error: `XML returned but contained no segments. Content: ${text.slice(0, 100)}` };
       }
 
       if (!trimmed.startsWith("{")) {
@@ -443,8 +443,8 @@ async function collectBrowserTranscript() {
   try {
     results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func:   _browserTranscriptScript,
-      world:  "MAIN",  // CRITICAL: access page's window + YouTube cookies
+      func: _browserTranscriptScript,
+      world: "MAIN",  // CRITICAL: access page's window + YouTube cookies
     });
   } catch (e) {
     console.warn("executeScript failed:", e);
@@ -675,27 +675,27 @@ function renderCitations(citations) {
 function formatAnswer(text) {
   let html = String(text)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    
+
   // Bold
   html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-  
+
   // Code
   html = html.replace(/`(.*?)`/g, "<code style='background:var(--bg-input);padding:1px 4px;border-radius:3px'>$1</code>");
 
   // Lists (bullet points and numbers)
   html = html.replace(/^([ \t]*)([\*\-\+]|\d+\.) (.+)$/gm, (match, indent, marker, content) => {
-      let margin = indent.length * 8 + 12;
-      let symbol = ['*', '-', '+'].includes(marker) ? '•' : marker;
-      return `</div><div style="margin-left: ${margin}px; display: flex; gap: 8px; margin-bottom: 6px;"><span style="min-width: 12px; flex-shrink: 0; color: var(--text-muted);">${symbol}</span><span>${content}</span></div><div class="text-block">`;
+    let margin = indent.length * 8 + 12;
+    let symbol = ['*', '-', '+'].includes(marker) ? '•' : marker;
+    return `</div><div style="margin-left: ${margin}px; display: flex; gap: 8px; margin-bottom: 6px;"><span style="min-width: 12px; flex-shrink: 0; color: var(--text-muted);">${symbol}</span><span>${content}</span></div><div class="text-block">`;
   });
 
   // Wrap in text blocks to isolate list styles from paragraphs
   html = `<div class="text-block">${html}</div>`;
   html = html.replace(/<div class="text-block">\s*<\/div>/g, "");
-  
+
   // Convert newlines to <br> inside regular text blocks
   html = html.replace(/<div class="text-block">([\s\S]*?)<\/div>/g, (match, content) => {
-      return `<div class="text-block" style="margin-bottom: 8px;">${content.trim().replace(/\n/g, '<br>')}</div>`;
+    return `<div class="text-block" style="margin-bottom: 8px;">${content.trim().replace(/\n/g, '<br>')}</div>`;
   });
 
   return html;

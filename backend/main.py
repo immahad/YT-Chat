@@ -44,9 +44,12 @@ from rag.transcript import TranscriptSegment, VideoTranscript
 async def lifespan(app: FastAPI):
     logger.info("🚀 YT Chat backend starting...")
     try:
-        from rag.retriever import _get_cross_encoder
-        await asyncio.get_event_loop().run_in_executor(None, _get_cross_encoder)
-        logger.info("✅ Cross-encoder loaded and ready")
+        if os.getenv("DISABLE_CROSS_ENCODER", "false").lower() == "true":
+            logger.info("Cross-encoder disabled via environment variable. Skipping warm-up.")
+        else:
+            from rag.retriever import _get_cross_encoder
+            await asyncio.get_event_loop().run_in_executor(None, _get_cross_encoder)
+            logger.info("✅ Cross-encoder loaded and ready")
     except Exception as e:
         logger.warning(f"Cross-encoder warm-up failed: {e}")
     yield
