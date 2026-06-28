@@ -80,7 +80,7 @@ def fetch_transcript(video_id: str) -> VideoTranscript:
 
     # List available tracks
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        transcript_list = YouTubeTranscriptApi().list(video_id)
     except Exception as e:
         err = str(e)
         if "429" in err or "Too Many Requests" in err:

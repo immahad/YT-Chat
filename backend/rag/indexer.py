@@ -89,9 +89,9 @@ def index_video(
     if already and not force:
         logger.info(f"Cache hit for {transcript.video_id} ({count} chunks). Skipping indexing.")
         vector_store = Chroma(
+            client=_get_chroma_client(),
             collection_name=collection,
             embedding_function=embeddings,
-            persist_directory=CHROMA_PERSIST_DIR,
         )
         return vector_store, count
 
@@ -127,10 +127,10 @@ def index_video(
 
     # ── Embed and store ───────────────────────────────────────────────────────
     vector_store = Chroma.from_documents(
+        client=_get_chroma_client(),
         documents=chunks,
         embedding=embeddings,
         collection_name=collection,
-        persist_directory=CHROMA_PERSIST_DIR,
     )
 
     logger.info(f"Indexed {len(chunks)} chunks into ChromaDB collection '{collection}'")
@@ -140,9 +140,9 @@ def index_video(
 def load_vector_store(video_id: str, embeddings: "Embeddings") -> Chroma:
     """Load an existing ChromaDB collection for a video."""
     return Chroma(
+        client=_get_chroma_client(),
         collection_name=_collection_name(video_id),
         embedding_function=embeddings,
-        persist_directory=CHROMA_PERSIST_DIR,
     )
 
 

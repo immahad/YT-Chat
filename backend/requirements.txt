@@ -15,9 +15,10 @@ langchain-community==0.3.13
 langchain-experimental==0.3.4
 langchain-text-splitters==0.3.5
 
-# ── LLM Providers (Google + OpenAI only) ─────────────────────────────────────
-langchain-google-genai==2.0.7
+# ── LLM Providers (Groq + OpenAI only) ───────────────────────────────────────
+langchain-groq==0.2.1
 langchain-openai==0.2.14
+langchain-huggingface==0.1.2
 
 # ── Vector Store ──────────────────────────────────────────────────────────────
 chromadb==0.5.23
@@ -28,8 +29,7 @@ rank-bm25==0.2.2
 sentence-transformers==2.7.0
 
 # ── YouTube Transcript ────────────────────────────────────────────────────────
-# MUST be 0.6.3 — v1.x omits Accept-Language header causing empty XML responses
-youtube-transcript-api==0.6.3
+youtube-transcript-api==1.2.4
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1

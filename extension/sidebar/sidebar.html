@@ -98,7 +98,7 @@
       </div>
       <div class="input-footer">
         <span id="char-count" class="char-count">0/500</span>
-        <span class="model-badge" id="model-badge">gemini-2.0-flash</span>
+        <span class="model-badge" id="model-badge">llama-3.3-70b-versatile</span>
       </div>
     </div>
   </div>
@@ -118,15 +118,15 @@
 
       <form id="settings-form" class="settings-form">
 
-        <!-- Provider Selector: Google & OpenAI only -->
+        <!-- Provider Selector: Groq & OpenAI only -->
         <div class="form-group">
           <label class="form-label">AI Provider</label>
           <div class="provider-grid">
             <label class="provider-option">
-              <input type="radio" name="provider" value="google" checked />
+              <input type="radio" name="provider" value="groq" checked />
               <span class="provider-card">
                 <span class="provider-icon">🤖</span>
-                <span class="provider-name">Google</span>
+                <span class="provider-name">Groq</span>
                 <span class="provider-tag free">FREE</span>
               </span>
             </label>
@@ -146,15 +146,15 @@
         <div class="form-group">
           <label for="chat-model" class="form-label">Chat Model</label>
           <select id="chat-model" class="form-select">
-            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast, Free)</option>
+            <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</option>
           </select>
         </div>
 
         <!-- API Key -->
         <div class="form-group">
           <label for="api-key" class="form-label" id="api-key-label">
-            Google API Key
-            <a id="get-key-link" href="https://aistudio.google.com/apikey" target="_blank" class="get-key-link">Get free key →</a>
+            Groq API Key
+            <a id="get-key-link" href="https://console.groq.com/keys" target="_blank" class="get-key-link">Get free key →</a>
           </label>
           <div class="key-input-wrapper">
             <input

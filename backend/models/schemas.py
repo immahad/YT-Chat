@@ -9,11 +9,11 @@ from typing import Literal, Optional
 
 class LLMConfig(BaseModel):
     """User's LLM configuration sent from the Chrome extension."""
-    provider: Literal["google", "openai"] = "google"
+    provider: Literal["groq", "openai"] = "groq"
     api_key: str = Field(..., description="The user's API key for the chosen provider")
     chat_model: str = Field(
-        "gemini-2.0-flash",
-        description="Chat model name. Defaults to Gemini 2.0 Flash."
+        "llama-3.3-70b-versatile",
+        description="Chat model name."
     )
     temperature: float = Field(0.2, ge=0.0, le=1.0)
 

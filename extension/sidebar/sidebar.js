@@ -7,60 +7,60 @@
 const API_BASE = "http://localhost:8000";
 
 const PROVIDER_MODELS = {
-  google: [
-    { value: "gemini-2.0-flash",       label: "Gemini 2.0 Flash (Fast, Free)" },
-    { value: "gemini-1.5-flash",       label: "Gemini 1.5 Flash" },
-    { value: "gemini-1.5-pro",         label: "Gemini 1.5 Pro (Powerful)" },
-    { value: "gemini-2.0-flash-lite",  label: "Gemini 2.0 Flash Lite (Fastest)" },
+  groq: [
+    { value: "llama-3.3-70b-versatile", label: "Llama 3.3 70B Versatile" },
+    { value: "llama3-8b-8192", label: "Llama 3 8B" },
+    { value: "mixtral-8x7b-32768", label: "Mixtral 8x7B" },
+    { value: "gemma2-9b-it", label: "Gemma 2 9B" },
   ],
   openai: [
-    { value: "gpt-4o-mini",  label: "GPT-4o Mini (Fast)" },
-    { value: "gpt-4o",       label: "GPT-4o (Powerful)" },
-    { value: "gpt-4-turbo",  label: "GPT-4 Turbo" },
+    { value: "gpt-4o-mini", label: "GPT-4o Mini (Fast)" },
+    { value: "gpt-4o", label: "GPT-4o (Powerful)" },
+    { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
   ],
 };
 
 const API_KEY_LABELS = {
-  google: { label: "Google API Key",  hint: "https://aistudio.google.com/apikey" },
-  openai: { label: "OpenAI API Key",  hint: "https://platform.openai.com/api-keys" },
+  groq: { label: "Groq API Key", hint: "https://console.groq.com/keys" },
+  openai: { label: "OpenAI API Key", hint: "https://platform.openai.com/api-keys" },
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentVideoId      = null;
-let currentVideoTitle   = null;
-let isIndexed           = false;
-let isStreaming         = false;
+let currentVideoId = null;
+let currentVideoTitle = null;
+let isIndexed = false;
+let isStreaming = false;
 let conversationHistory = [];
 let settings = {
-  provider:    "google",
-  chatModel:   "gemini-2.0-flash",
-  apiKey:      "",
+  provider: "groq",
+  chatModel: "llama-3.3-70b-versatile",
+  apiKey: "",
   temperature: 0.2,
 };
 
 // ── DOM references ────────────────────────────────────────────────────────────
-const $  = (id) => document.getElementById(id);
-const stateNoVideo   = $("state-no-video");
-const stateSetup     = $("state-setup");
-const stateIndexing  = $("state-indexing");
-const stateChat      = $("state-chat");
-const videoBar       = $("video-bar");
-const videoTitleEl   = $("video-title");
-const videoStatusEl  = $("video-status");
-const messagesEl     = $("messages");
-const chatInput      = $("chat-input");
-const sendBtn        = $("btn-send");
-const settingsPanel  = $("settings-panel");
-const btnSettings    = $("btn-settings");
+const $ = (id) => document.getElementById(id);
+const stateNoVideo = $("state-no-video");
+const stateSetup = $("state-setup");
+const stateIndexing = $("state-indexing");
+const stateChat = $("state-chat");
+const videoBar = $("video-bar");
+const videoTitleEl = $("video-title");
+const videoStatusEl = $("video-status");
+const messagesEl = $("messages");
+const chatInput = $("chat-input");
+const sendBtn = $("btn-send");
+const settingsPanel = $("settings-panel");
+const btnSettings = $("btn-settings");
 const btnCloseSettings = $("btn-close-settings");
-const btnReindex     = $("btn-reindex");
-const charCount      = $("char-count");
-const modelBadge     = $("model-badge");
+const btnReindex = $("btn-reindex");
+const charCount = $("char-count");
+const modelBadge = $("model-badge");
 const settingsStatus = $("settings-status");
-const tempValueEl    = $("temp-value");
-const apiKeyInput    = $("api-key");
+const tempValueEl = $("temp-value");
+const apiKeyInput = $("api-key");
 const chatModelSelect = $("chat-model");
-const indexingDesc   = $("indexing-desc");
+const indexingDesc = $("indexing-desc");
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -76,9 +76,9 @@ async function loadSettings() {
     chrome.storage.sync.get("ytchat_settings", (data) => {
       if (data.ytchat_settings) {
         settings = { ...settings, ...data.ytchat_settings };
-        if (settings.provider === "anthropic" || settings.provider === "grok") {
-          settings.provider  = "google";
-          settings.chatModel = "gemini-2.0-flash";
+        if (settings.provider === "anthropic" || settings.provider === "grok" || settings.provider === "google") {
+          settings.provider = "groq";
+          settings.chatModel = "llama-3.3-70b-versatile";
         }
       }
       applySettingsToForm();
@@ -88,9 +88,9 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
-  const provider    = document.querySelector('input[name="provider"]:checked')?.value || "google";
-  const chatModel   = chatModelSelect.value;
-  const apiKey      = apiKeyInput.value.trim();
+  const provider = document.querySelector('input[name="provider"]:checked')?.value || "groq";
+  const chatModel = chatModelSelect.value;
+  const apiKey = apiKeyInput.value.trim();
   const temperature = parseFloat($("temperature").value);
 
   if (!apiKey) { showSettingsStatus("Please enter your API key", "error"); return; }
@@ -115,23 +115,23 @@ function applySettingsToForm() {
   if (radio) radio.checked = true;
   updateProviderUI(settings.provider);
   updateModelOptions(settings.provider);
-  chatModelSelect.value  = settings.chatModel;
-  apiKeyInput.value      = settings.apiKey || "";
+  chatModelSelect.value = settings.chatModel;
+  apiKeyInput.value = settings.apiKey || "";
   $("temperature").value = settings.temperature;
   tempValueEl.textContent = settings.temperature;
   modelBadge.textContent = settings.chatModel;
 }
 
 function updateProviderUI(provider) {
-  const apiLabel = API_KEY_LABELS[provider] || API_KEY_LABELS.google;
-  const labelEl  = $("api-key-label");
+  const apiLabel = API_KEY_LABELS[provider] || API_KEY_LABELS.groq;
+  const labelEl = $("api-key-label");
   labelEl.childNodes[0].textContent = apiLabel.label + " ";
   $("get-key-link").href = apiLabel.hint;
   updateModelOptions(provider);
 }
 
 function updateModelOptions(provider) {
-  const models = PROVIDER_MODELS[provider] || PROVIDER_MODELS.google;
+  const models = PROVIDER_MODELS[provider] || PROVIDER_MODELS.groq;
   chatModelSelect.innerHTML = models.map(m =>
     `<option value="${m.value}">${m.label}</option>`
   ).join("");
@@ -141,7 +141,7 @@ function updateModelOptions(provider) {
 
 function showSettingsStatus(msg, type) {
   settingsStatus.textContent = msg;
-  settingsStatus.className   = `settings-status ${type}`;
+  settingsStatus.className = `settings-status ${type}`;
   settingsStatus.classList.remove("hidden");
 }
 
@@ -151,10 +151,10 @@ function showScreen(name) {
   stateSetup.classList.add("hidden");
   stateIndexing.classList.add("hidden");
   stateChat.classList.add("hidden");
-  if (name === "no-video")  stateNoVideo.classList.remove("hidden");
-  if (name === "setup")     stateSetup.classList.remove("hidden");
-  if (name === "indexing")  stateIndexing.classList.remove("hidden");
-  if (name === "chat")      stateChat.classList.remove("hidden");
+  if (name === "no-video") stateNoVideo.classList.remove("hidden");
+  if (name === "setup") stateSetup.classList.remove("hidden");
+  if (name === "indexing") stateIndexing.classList.remove("hidden");
+  if (name === "chat") stateChat.classList.remove("hidden");
 }
 
 // ── Video Detection ───────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ async function checkCurrentTab() {
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab && tab.url && tab.url.includes("youtube.com/watch")) {
-      const url     = new URL(tab.url);
+      const url = new URL(tab.url);
       const videoId = url.searchParams.get("v");
       if (videoId) handleVideoChange(videoId, tab.title?.replace(" - YouTube", "").trim() || "YouTube Video");
     }
@@ -183,14 +183,21 @@ function listenForVideoChanges() {
 }
 
 async function handleVideoChange(videoId, videoTitle) {
-  if (videoId === currentVideoId) return;
-  currentVideoId      = videoId;
-  currentVideoTitle   = videoTitle || "YouTube Video";
+  if (videoId === currentVideoId) {
+    if (videoTitle && videoTitle !== currentVideoTitle && videoTitle !== "YouTube Video") {
+      currentVideoTitle = videoTitle;
+      videoTitleEl.textContent = currentVideoTitle;
+    }
+    return;
+  }
+  currentVideoId = videoId;
+  currentVideoTitle = videoTitle || "YouTube Video";
   conversationHistory = [];
+  messagesEl.innerHTML = "";
   videoBar.classList.remove("hidden");
-  videoTitleEl.textContent  = currentVideoTitle;
+  videoTitleEl.textContent = currentVideoTitle;
   videoStatusEl.textContent = "Checking...";
-  videoStatusEl.className   = "video-status";
+  videoStatusEl.className = "video-status";
   if (!settings.apiKey) { showScreen("setup"); return; }
   triggerIndexing(videoId);
 }
@@ -204,7 +211,7 @@ async function triggerIndexing(videoId) {
       if (data && data.is_indexed) {
         isIndexed = true;
         videoStatusEl.textContent = `✓ Ready (${data.num_chunks} chunks cached)`;
-        videoStatusEl.className   = "video-status indexed";
+        videoStatusEl.className = "video-status indexed";
         btnReindex.classList.remove("hidden");
         showChatScreen();
         return;
@@ -217,21 +224,21 @@ async function triggerIndexing(videoId) {
   isIndexed = false;
   showScreen("indexing");
   videoStatusEl.textContent = "Indexing...";
-  videoStatusEl.className   = "video-status indexing";
-  indexingDesc.textContent  = "Reading transcript from YouTube player...";
+  videoStatusEl.className = "video-status indexing";
+  indexingDesc.textContent = "Reading transcript from YouTube player...";
 
   try {
     const data = await indexCurrentVideo(videoId, false);
     isIndexed = true;
     videoStatusEl.textContent = `✓ Ready (${data.num_chunks} chunks)`;
-    videoStatusEl.className   = "video-status indexed";
+    videoStatusEl.className = "video-status indexed";
     btnReindex.classList.remove("hidden");
     showChatScreen();
   } catch (e) {
     console.error("Indexing error:", e);
     if (isNetworkError(e)) { showBackendError(); return; }
     videoStatusEl.textContent = "✗ Indexing failed";
-    videoStatusEl.className   = "video-status";
+    videoStatusEl.className = "video-status";
     showIndexingError(e.message);
   }
 }
@@ -260,9 +267,9 @@ function showIndexingError(msg) {
  * picks the best caption track, fetches it as json3 (reliable JSON format),
  * and returns the segments.
  *
- * KEY FIX: We append &fmt=json3 to the baseUrl. YouTube's timedtext endpoint
- * supports fmt=json3 which returns structured JSON instead of XML.
- * This avoids all XML parsing issues and bot-detection empty-body problems.
+ * KEY FIX:
+   Use browser context + json3.
+   YouTube may reject bare timedtext requests.
  */
 function _browserTranscriptScript() {
   /* --- helper: get playerResponse from page --- */
@@ -292,9 +299,9 @@ function _browserTranscriptScript() {
 
   /* --- helper: pick best track --- */
   function pickTrack(tracks) {
-    const enManual  = tracks.find(t => t.languageCode?.startsWith("en") && t.kind !== "asr");
+    const enManual = tracks.find(t => t.languageCode?.startsWith("en") && t.kind !== "asr");
     const anyManual = tracks.find(t => t.kind !== "asr");
-    const enAuto    = tracks.find(t => t.languageCode?.startsWith("en") && t.kind === "asr");
+    const enAuto = tracks.find(t => t.languageCode?.startsWith("en") && t.kind === "asr");
     return enManual || anyManual || enAuto || tracks[0] || null;
   }
 
@@ -306,7 +313,7 @@ function _browserTranscriptScript() {
       if (!text || text === "\n") continue;
       segments.push({
         text,
-        start:    (event.tStartMs    || 0) / 1000,
+        start: (event.tStartMs || 0) / 1000,
         duration: (event.dDurationMs || 0) / 1000,
       });
     }
@@ -332,7 +339,14 @@ function _browserTranscriptScript() {
 
     let response;
     try {
-      response = await fetch(url.toString(), { credentials: "include" });
+      response = await fetch(url.toString(), {
+        method: "GET",
+        credentials: "omit",
+        headers: {
+          "Accept": "application/json,text/plain,*/*",
+          "Accept-Language": "en-US,en;q=0.9"
+        }
+      });
     } catch (e) {
       return { error: `Fetch failed: ${e.message}` };
     }
@@ -340,15 +354,73 @@ function _browserTranscriptScript() {
     if (!response.ok) return { error: `HTTP ${response.status} from timedtext API` };
 
     let body;
+
+    const contentType = response.headers.get("content-type") || "";
+
     try {
-      body = await response.json();
-    } catch (e) {
-      // Fallback: try text and parse
-      const text = await response.text().catch(() => "");
-      if (!text || !text.trim().startsWith("{")) {
-        return { error: `Non-JSON response (${response.headers.get("content-type") || "?"}) body=${text.slice(0,100)}` };
+
+      const text = await response.text();
+
+      console.log(
+        "YT transcript response:",
+        contentType,
+        text.slice(0, 200)
+      );
+
+
+      if (!text || !text.trim()) {
+        return {
+          error:
+            `Empty transcript response. Content-Type=${contentType}`
+        };
       }
-      try { body = JSON.parse(text); } catch { return { error: "JSON parse failed" }; }
+
+
+      const trimmed = text.trim();
+
+      // Handle XML response (YouTube default format for some tracks)
+      if (trimmed.startsWith("<") || trimmed.startsWith("<?xml")) {
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(text, "text/xml");
+        if (!xml.querySelector("parsererror")) {
+          const xmlSegs = Array.from(xml.getElementsByTagName("text"))
+            .map(n => ({
+              text: (n.textContent || "")
+                .replace(/&amp;/g, "&").replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">").replace(/&#39;/g, "'")
+                .replace(/&quot;/g, '"').trim(),
+              start:    parseFloat(n.getAttribute("start")   || "0"),
+              duration: parseFloat(n.getAttribute("dur")     || "0"),
+            }))
+            .filter(s => s.text);
+          if (xmlSegs.length) {
+            return {
+              segments:    xmlSegs,
+              language:    track.languageCode || "unknown",
+              is_generated: track.kind === "asr",
+              source:      "browser",
+            };
+          }
+        }
+        return { error: `XML returned but contained no segments. Content: ${text.slice(0,100)}` };
+      }
+
+      if (!trimmed.startsWith("{")) {
+        return {
+          error: `YouTube returned unexpected format. Content-Type=${contentType} Body=${text.slice(0, 150)}`
+        };
+      }
+
+      body = JSON.parse(text);
+
+
+    } catch (e) {
+
+      return {
+        error:
+          `Transcript parsing failed: ${e.message}`
+      };
+
     }
 
     const segments = parseJson3(body);
@@ -356,9 +428,9 @@ function _browserTranscriptScript() {
 
     return {
       segments,
-      language:     track.languageCode || "unknown",
+      language: track.languageCode || "unknown",
       is_generated: track.kind === "asr",
-      source:       "browser",
+      source: "browser",
     };
   })();
 }
@@ -372,6 +444,7 @@ async function collectBrowserTranscript() {
     results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func:   _browserTranscriptScript,
+      world:  "MAIN",  // CRITICAL: access page's window + YouTube cookies
     });
   } catch (e) {
     console.warn("executeScript failed:", e);
@@ -407,16 +480,16 @@ async function indexCurrentVideo(videoId, forceReindex) {
   }
 
   const payload = {
-    video_id:      videoId,
+    video_id: videoId,
     force_reindex: forceReindex,
-    llm_config:    buildLLMConfig(),
+    llm_config: buildLLMConfig(),
   };
   if (transcript) payload.transcript = transcript;
 
-  const res  = await safeFetch(`${API_BASE}/index`, {
-    method:  "POST",
+  const res = await safeFetch(`${API_BASE}/index`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(payload),
+    body: JSON.stringify(payload),
   });
   const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
@@ -471,22 +544,23 @@ async function sendMessage() {
   let fullAnswer = "", usedRag = true, citations = [];
   const bubbleEl = assistantMsgEl.querySelector(".message-bubble");
   const cursorEl = bubbleEl.querySelector(".streaming-cursor");
-  const badgeEl  = assistantMsgEl.querySelector(".route-badge");
+  const loadingIndicator = bubbleEl.querySelector("#loading-indicator");
+  const badgeEl = assistantMsgEl.querySelector(".route-badge");
 
   try {
     const res = await safeFetch(`${API_BASE}/chat`, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        video_id:             currentVideoId,
+        video_id: currentVideoId,
         question,
-        llm_config:           buildLLMConfig(),
+        llm_config: buildLLMConfig(),
         conversation_history: conversationHistory,
       }),
     });
     if (!res.ok) { const d = await safeJson(res); throw new Error(d?.detail || `Server error ${res.status}`); }
 
-    const reader  = res.body.getReader();
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
     const textNode = document.createTextNode("");
     bubbleEl.insertBefore(textNode, cursorEl);
@@ -511,6 +585,10 @@ async function sendMessage() {
         } else if (event.type === "citations") {
           citations = event.data;
         } else if (event.type === "token") {
+          if (loadingIndicator && loadingIndicator.parentNode) {
+            loadingIndicator.remove();
+            cursorEl.classList.remove("hidden");
+          }
           fullAnswer += event.content;
           textNode.textContent = fullAnswer;
           scrollToBottom();
@@ -551,7 +629,7 @@ function addUserMessage(text) {
 function addAssistantMessagePlaceholder() {
   const el = document.createElement("div");
   el.className = "message assistant";
-  el.innerHTML = `<div class="message-avatar">✨</div><div class="message-content"><div class="route-badge rag">📹 Video Grounded</div><div class="message-bubble"><span class="streaming-cursor"></span></div></div>`;
+  el.innerHTML = `<div class="message-avatar">✨</div><div class="message-content"><div class="route-badge rag">📹 Video Grounded</div><div class="message-bubble"><div class="typing-indicator" id="loading-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div><span class="streaming-cursor hidden"></span></div></div>`;
   messagesEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -595,15 +673,32 @@ function renderCitations(citations) {
 }
 
 function formatAnswer(text) {
-  return text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/`(.*?)`/g, "<code style='background:var(--bg-input);padding:1px 4px;border-radius:3px'>$1</code>")
-    .replace(/^• (.*?)$/gm, "<li>$1</li>")
-    .replace(/^\d+\. (.*?)$/gm, "<li>$1</li>")
-    .replace(/\n\n/g, "</p><p>").replace(/^/, "<p>").replace(/$/, "</p>")
-    .replace(/<p><\/p>/g, "");
+  let html = String(text)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  
+  // Code
+  html = html.replace(/`(.*?)`/g, "<code style='background:var(--bg-input);padding:1px 4px;border-radius:3px'>$1</code>");
+
+  // Lists (bullet points and numbers)
+  html = html.replace(/^([ \t]*)([\*\-\+]|\d+\.) (.+)$/gm, (match, indent, marker, content) => {
+      let margin = indent.length * 8 + 12;
+      let symbol = ['*', '-', '+'].includes(marker) ? '•' : marker;
+      return `</div><div style="margin-left: ${margin}px; display: flex; gap: 8px; margin-bottom: 6px;"><span style="min-width: 12px; flex-shrink: 0; color: var(--text-muted);">${symbol}</span><span>${content}</span></div><div class="text-block">`;
+  });
+
+  // Wrap in text blocks to isolate list styles from paragraphs
+  html = `<div class="text-block">${html}</div>`;
+  html = html.replace(/<div class="text-block">\s*<\/div>/g, "");
+  
+  // Convert newlines to <br> inside regular text blocks
+  html = html.replace(/<div class="text-block">([\s\S]*?)<\/div>/g, (match, content) => {
+      return `<div class="text-block" style="margin-bottom: 8px;">${content.trim().replace(/\n/g, '<br>')}</div>`;
+  });
+
+  return html;
 }
 
 function escapeHtml(text) {
@@ -616,7 +711,7 @@ async function jumpToTimestamp(seconds) {
     if (!tab) return;
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: (s) => { const v = document.querySelector("video"); if (v) { v.currentTime = s; v.play().catch(() => {}); } },
+      func: (s) => { const v = document.querySelector("video"); if (v) { v.currentTime = s; v.play().catch(() => { }); } },
       args: [seconds],
     });
   } catch (e) { console.warn("jumpToTimestamp:", e); }
@@ -634,7 +729,7 @@ function updateSendButton() {
 function updateCharCount() {
   const len = chatInput.value.length;
   charCount.textContent = `${len}/500`;
-  charCount.className   = len > 400 ? "char-count warn" : "char-count";
+  charCount.className = len > 400 ? "char-count warn" : "char-count";
 }
 
 function scrollToBottom() {
@@ -643,7 +738,7 @@ function scrollToBottom() {
 
 // ── Event Listeners ───────────────────────────────────────────────────────────
 function setupEventListeners() {
-  btnSettings.addEventListener("click",      () => settingsPanel.classList.remove("hidden"));
+  btnSettings.addEventListener("click", () => settingsPanel.classList.remove("hidden"));
   btnCloseSettings.addEventListener("click", () => settingsPanel.classList.add("hidden"));
   $("btn-open-settings-setup").addEventListener("click", () => settingsPanel.classList.remove("hidden"));
   $("settings-form").addEventListener("submit", (e) => { e.preventDefault(); saveSettings(); });
@@ -669,17 +764,17 @@ function setupEventListeners() {
     messagesEl.innerHTML = "";
     showScreen("indexing");
     videoStatusEl.textContent = "Re-indexing...";
-    videoStatusEl.className   = "video-status indexing";
+    videoStatusEl.className = "video-status indexing";
     try {
       const data = await indexCurrentVideo(currentVideoId, true);
       isIndexed = true;
       videoStatusEl.textContent = `✓ Re-indexed (${data.num_chunks} chunks)`;
-      videoStatusEl.className   = "video-status indexed";
+      videoStatusEl.className = "video-status indexed";
       btnReindex.classList.remove("hidden");
       showChatScreen();
     } catch (e) {
       videoStatusEl.textContent = `✗ ${e.message}`;
-      videoStatusEl.className   = "video-status";
+      videoStatusEl.className = "video-status";
     }
   });
   chatInput.addEventListener("input", () => {
