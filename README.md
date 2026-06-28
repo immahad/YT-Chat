@@ -8,7 +8,7 @@ A production-level Chrome Extension that adds an **AI-powered chat panel** besid
 
 | Feature | Details |
 |---|---|
-| **Multi-Provider LLM** | Google Gemini (default, free), OpenAI, Anthropic, Grok |
+| **Multi-Provider LLM** | Groq (default, free), OpenAI |
 | **Advanced RAG** | Multi-query, Hybrid retrieval, MMR, Cross-encoder reranking |
 | **Smart Caching** | Video transcripts indexed once, reused forever |
 | **Timestamp Citations** | Click a citation chip to jump to that moment in the video |
@@ -39,12 +39,12 @@ python main.py
 
 ### Step 2: Configure API Key
 
-Edit `backend/.env`:
+Edit `backend/.env` (optional, since you can enter it in the extension UI directly):
 ```env
-GOOGLE_API_KEY=your_google_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-Get a **free** Google API key at: https://aistudio.google.com/apikey
+Get a **free** Groq API key at: https://console.groq.com/keys
 
 ### Step 3: Load the Chrome Extension
 
@@ -99,10 +99,8 @@ YT Chat/
 
 | Provider | Chat Model | Embedding | Get Key |
 |---|---|---|---|
-| **Google** (default, free) | gemini-2.0-flash | text-embedding-004 | [aistudio.google.com](https://aistudio.google.com/apikey) |
+| **Groq** (default, free) | llama-3.3-70b-versatile | HuggingFace (all-MiniLM-L6-v2) | [console.groq.com](https://console.groq.com/keys) |
 | OpenAI | gpt-4o-mini | text-embedding-3-small | [platform.openai.com](https://platform.openai.com/api-keys) |
-| Anthropic | claude-3-5-haiku | Google (needs 2nd key) | [console.anthropic.com](https://console.anthropic.com) |
-| Grok (xAI) | grok-3-mini | Google (needs 2nd key) | [console.x.ai](https://console.x.ai) |
 
 ---
 
@@ -160,6 +158,6 @@ Interactive docs: http://localhost:8000/docs
 
 ## 📦 Dependencies
 
-**Backend**: FastAPI, LangChain, ChromaDB, sentence-transformers, BM25, youtube-transcript-api, langchain-google-genai, langchain-openai, langchain-anthropic
+**Backend**: FastAPI, LangChain, ChromaDB, sentence-transformers, BM25, youtube-transcript-api, langchain-groq, langchain-openai, langchain-huggingface
 
 **Extension**: Pure HTML/CSS/JavaScript (no build step required!)
