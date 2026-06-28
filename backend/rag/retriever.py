@@ -180,8 +180,8 @@ def rerank_documents(
         return []
 
     import os
-    if os.getenv("DISABLE_CROSS_ENCODER", "false").lower() == "true":
-        logger.info("Cross-encoder disabled via environment variable. Skipping reranking.")
+    if os.getenv("DISABLE_CROSS_ENCODER", "false").lower() == "true" or os.getenv("RENDER", "false").lower() == "true":
+        logger.info("Running on Render (or cross-encoder disabled). Skipping reranking.")
         return docs[:top_k]
 
     cross_encoder = _get_cross_encoder()
